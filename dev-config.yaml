@@ -1,0 +1,14 @@
+# A sample configuration, mostly used for dev
+---
+db:
+  path: db.sqlite
+files:
+  hashes:
+    # all known hash algorithms
+    - sha1
+    - sha2-256
+    - sha2-384
+    - sha2-512
+    - sha3-256
+    - sha3-384
+    - sha3-512
