@@ -41,6 +41,16 @@ impl Collection {
         .map_err(Into::into)
     }
 
+    pub fn for_name(conn: &Connection, name: &str) -> anyhow::Result<Option<Self>> {
+        conn.query_row(
+            "SELECT * FROM collections WHERE name = ?",
+            params![name],
+            Self::star_mapper,
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
     pub fn all(conn: &Connection) -> anyhow::Result<Vec<Self>> {
         let mut stmt = conn.prepare("SELECT * FROM collections")?;
         let mut rows = stmt

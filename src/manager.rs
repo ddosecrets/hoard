@@ -26,6 +26,10 @@ impl Manager {
         Self { config, conn }
     }
 
+    pub(crate) fn conn(&mut self) -> &mut Connection {
+        &mut self.conn
+    }
+
     pub fn init(config_path: impl AsRef<Path>) -> anyhow::Result<()> {
         let config_path = config_path.as_ref();
         let config_dir = config_path.parent().unwrap(); // unwrap ok because files have parents

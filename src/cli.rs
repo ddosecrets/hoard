@@ -17,7 +17,7 @@
 //!
 //! Create a collection of files.
 //! ```shell
-//! hoard collection add "my cold storage"
+//! hoard collection add "my-leaks"
 //! ```
 //!
 //! Add a DB entry for a physical disk.
@@ -32,26 +32,27 @@
 //!
 //! Add a local file to the virtual "file system" of the disk pool.
 //! ```shell
-//! hoard file add --collection-id 72ea7d62-7b71-437c-9f64-e0e7469a4605 \
+//! hoard file add --collection my-leaks \
 //!     /local/path/to/my/file.txt /some-dir/file.txt
 //! ```
 //!
 //! Run an `ls`-like command against the virtual "file system" (works offline).
 //! ```shell
-//! hoard file ls --collection-id 1 /some-dir/
+//! hoard file ls --collection my-leaks /some-dir/
 //! ```
 //!
 //! Run a `find`-like command against the virtual "file system" (works offline).
 //! ```shell
-//! hoard file find --collection-id 1 /
+//! hoard file find --collection my-leaks /
 //! ```
 //!
 //! Inspect a file and get information about where it's located.
 //! ```shell
-//! hoard file inspect --collection-id 1 /some-dir/file.txt
+//! hoard file inspect --collection my-leaks /some-dir/file.txt
 //! ```
 use crate::config::Config;
 use crate::db::add_functions;
+use crate::db::types::Collection;
 use crate::fs_utils::canonical_path;
 use crate::manager::Manager;
 use clap::Parser;
@@ -167,13 +168,18 @@ fn print_table(table: TableStruct) -> anyhow::Result<()> {
 }
 
 fn parse_uuid(string: &str) -> Result<Uuid, String> {
-    Uuid::parse_str(string).map_err(|e| format!("{}", e))
+    Uuid::parse_str(string).map_err(|e| e.to_string())
 }
 
 fn parse_regex(string: &str) -> Result<Regex, String> {
     // new line to separate Clap's error line from the nicely formatted
     // helper string for the regex  syntax error
     Regex::new(string).map_err(|e| format!("\n{e}"))
+}
+
+fn get_collection(conn: &Connection, name: &str) -> anyhow::Result<Collection> {
+    Collection::for_name(conn, name)?
+        .ok_or_else(|| anyhow!("Collection with name {name} not found"))
 }
 
 /// A CLI tool for managing large data sets across many disks
@@ -206,7 +212,7 @@ enum Command {
     /// Manage physical disks
     #[clap(subcommand)]
     Disk(DiskCmd),
-    /// Manage files in the hoardFS
+    /// Manage files in the hoard disk pool
     #[clap(subcommand)]
     File(FileCmd),
     /// Initialize the local directories
@@ -287,16 +293,16 @@ impl DiskCmd {
 enum FileCmd {
     /// Add a file and copy it to the partition
     Add {
-        /// The ID of the collection the file belongs to
-        #[clap(long = "collection-id", short = 'c', value_name = "ID", parse(try_from_str = parse_uuid))]
-        collection_id: Uuid,
+        /// The name of the collection the file belongs to
+        #[clap(long = "collection", short = 'c', value_name = "NAME")]
+        collection_name: String,
         /// The ID of the partion the file will be placed on
         #[clap(long = "partition-id", short = 'p', value_name = "ID", parse(try_from_str = parse_uuid))]
         partition_id: Option<Uuid>,
         /// The path of the file on the local system
         #[clap(value_name = "SRC")]
         src_path: String,
-        /// The virtual path on the hoardFS
+        /// The virtual path on the hoard disk pool
         #[clap(parse(try_from_str = canonical_path), value_name = "DEST")]
         dest_path: PathBuf,
         /// Move the file on to the target partition instead of copying it
@@ -305,9 +311,9 @@ enum FileCmd {
     },
     /// Find a file meeting certain criteria
     Find {
-        /// The ID of the collection the file belongs to
-        #[clap(long = "collection-id", short = 'c', value_name = "ID", parse(try_from_str = parse_uuid))]
-        collection_id: Uuid,
+        /// The name of the collection the files belongs to
+        #[clap(long = "collection", short = 'c', value_name = "NAME")]
+        collection_name: String,
         /// Minimum depth to search
         #[clap(long = "min-depth", value_name = "INT")]
         min_depth: Option<u32>,
@@ -326,20 +332,20 @@ enum FileCmd {
     },
     /// Inspect a file and show metadata
     Inspect {
-        /// The ID of the collection the file belongs to
-        #[clap(long = "collection-id", short = 'c', value_name = "ID", parse(try_from_str = parse_uuid))]
-        collection_id: Uuid,
-        /// The virtual path on the hoardFS
+        /// The name of the collection the file belongs to
+        #[clap(long = "collection", short = 'c', value_name = "NAME")]
+        collection_name: String,
+        /// The virtual path on the hoard disk pool
         #[clap(value_name = "FILE", parse(try_from_str = canonical_path))]
         path: PathBuf,
     },
     /// List files (similar to `ls`)
     #[clap(name = "ls")]
     List {
-        /// The ID of the collection the file belongs to
-        #[clap(long = "collection-id", short = 'c', value_name = "ID", parse(try_from_str = parse_uuid))]
-        collection_id: Uuid,
-        /// Path or glob to files on the hoardFS
+        /// The name of the collection the files belongs to
+        #[clap(long = "collection", short = 'c', value_name = "NAME")]
+        collection_name: String,
+        /// Path or glob to files on the hoard disk pool
         // TODO min values here doesn't work (??)
         #[clap(value_name = "FILE", min_values = 1)]
         files: Vec<String>,
@@ -353,28 +359,32 @@ impl FileCmd {
     fn run(&self, manager: &mut Manager) -> anyhow::Result<()> {
         match self {
             Self::Add {
-                collection_id,
+                collection_name,
                 partition_id,
                 src_path,
                 dest_path,
                 move_file,
-            } => manager.add_file(
-                collection_id,
-                partition_id.as_ref(),
-                src_path,
-                dest_path,
-                *move_file,
-            ),
+            } => {
+                let collection = get_collection(manager.conn(), collection_name)?;
+                manager.add_file(
+                    collection.id(),
+                    partition_id.as_ref(),
+                    src_path,
+                    dest_path,
+                    *move_file,
+                )
+            }
             Self::Find {
-                collection_id,
+                collection_name,
                 min_depth,
                 max_depth,
                 name,
                 path,
                 files,
             } => {
+                let collection = get_collection(manager.conn(), collection_name)?;
                 for file in manager.find_files(
-                    collection_id,
+                    collection.id(),
                     *min_depth,
                     *max_depth,
                     name.as_ref(),
@@ -388,21 +398,23 @@ impl FileCmd {
                 Ok(())
             }
             Self::Inspect {
-                collection_id,
+                collection_name,
                 path,
             } => {
+                let collection = get_collection(manager.conn(), collection_name)?;
                 let path = path.to_str().ok_or_else(|| {
                     anyhow!("Path could not be made UTF-8: {}", path.to_string_lossy())
                 })?;
-                println!("{}", manager.inspect_file(collection_id, path)?);
+                println!("{}", manager.inspect_file(collection.id(), path)?);
                 Ok(())
             }
             Self::List {
-                collection_id,
+                collection_name,
                 all,
                 files,
             } => {
-                for file in manager.list_files(collection_id, files.iter().map(|s| &**s), *all)? {
+                let collection = get_collection(manager.conn(), collection_name)?;
+                for file in manager.list_files(collection.id(), files.iter().map(|s| &**s), *all)? {
                     // TODO this should trim the leading bit of the path off
                     // e.g., `ls /foo/` should return only `bar` if `/foo/bar` exists
                     println!("{}", file.path());

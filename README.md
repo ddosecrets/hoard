@@ -9,10 +9,10 @@ A tool to allow data hoarders to split data sets across a pool of offline extern
 ```bash
 $ hoard disk add --label russia-leaks-01 /dev/sdb
 $ hoard partition add /dev/sdb1
-$ hoard collection add vgtrk  # outputs an ID to be used in later steps
-$ hoard file add -c "$C_ID" ~/torrents/some-leak/path-to-file.zip /some-leak/path-to-file.zip
-$ umount /dev/sdb1
-$ hoard file ls -c "$C_ID" /some-leak/  # still works!
+$ hoard collection add vgtrk
+$ hoard file add -c vgtrk ~/torrents/some-leak/path-to-file.zip /some-leak/path-to-file.zip
+$ umount /dev/sdb1  # can still search files while devices not mounted
+$ hoard file ls -c vgtrk /some-leak/
 ```
 
 ## Requirements

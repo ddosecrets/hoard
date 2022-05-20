@@ -43,16 +43,11 @@ run_and_log "${hoard[@]}" disk add --label 'my-disk' "$DISK_PATH"
 run_and_log "${hoard[@]}" disk ls 
 run_and_log "${hoard[@]}" partition add "$PARTITION_PATH"
 run_and_log "${hoard[@]}" partition ls
-
-declare COLLECTION_ID
-COLLECTION_ID="$(sqlite3 "$SQLITE_DB" 'select hex(id) from collections limit 1')"
-declare -r COLLECTION_ID
-
-run_and_log "${hoard[@]}" file add -c "$COLLECTION_ID" "$LOCAL_FILE" "$VIRT_FILE"
-run_and_log "${hoard[@]}" file add -c "$COLLECTION_ID" "$LOCAL_ARCHIVE" "$VIRT_ARCHIVE"
-run_and_log "${hoard[@]}" file ls -c "$COLLECTION_ID" "$VIRT_FILE"
-run_and_log "${hoard[@]}" file find -c "$COLLECTION_ID" "$VIRT_DIR"
-run_and_log "${hoard[@]}" file inspect -c "$COLLECTION_ID" "$VIRT_FILE"
+run_and_log "${hoard[@]}" file add -c "$COLLECTION" "$LOCAL_FILE" "$VIRT_FILE"
+run_and_log "${hoard[@]}" file add -c "$COLLECTION" "$LOCAL_ARCHIVE" "$VIRT_ARCHIVE"
+run_and_log "${hoard[@]}" file ls -c "$COLLECTION" "$VIRT_FILE"
+run_and_log "${hoard[@]}" file find -c "$COLLECTION" "$VIRT_DIR"
+run_and_log "${hoard[@]}" file inspect -c "$COLLECTION" "$VIRT_FILE"
 
 echo -e '\n'
 echo 'The smoke test went happily :)'
