@@ -1,5 +1,6 @@
 use crate::archive_utils;
 use crate::config::Config;
+use crate::db::init_connection;
 use crate::db::types::{
     Collection, Disk, File, FileHash, FilePlacement, NewCollection, NewDisk, NewFile,
     NewFileArchive, NewFileHash, NewFilePlacement, NewPartition, Partition,
@@ -39,13 +40,24 @@ impl Manager {
             fs::create_dir(config_dir)?;
         }
 
-        if !config_path.exists() {
+        let config = if !config_path.exists() {
             log::info!("Config file did not exist, writing default");
             let config = Config::default();
             serde_yaml::to_writer(fs::File::create(config_path)?, &config)?;
-        }
-
+            config
+        } else {
+            serde_yaml::from_reader(fs::File::open(config_path)?)?
+        };
         log::info!("Directories and config set up.");
+
+        let conn = Connection::open(config.db().path())?;
+        init_connection(&conn)?;
+
+        let mut manager = Self { config, conn };
+        manager.db_migrate()?;
+
+        log::info!("DB migrated.");
+        log::info!("Initialization completed.");
         Ok(())
     }
 

@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::db::add_functions;
+use crate::db::init_connection;
 use crate::db::types::{
     Collection, Disk, File, NewCollection, NewDisk, NewFile, NewFileHash, NewFilePlacement,
     NewPartition, Partition,
@@ -15,7 +15,7 @@ pub fn config() -> Config {
 
 pub fn db() -> Connection {
     let mut conn = Connection::open_in_memory().unwrap();
-    add_functions(&conn).unwrap();
+    init_connection(&conn).unwrap();
     migrate(&mut conn).unwrap();
     conn
 }

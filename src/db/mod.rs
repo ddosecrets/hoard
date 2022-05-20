@@ -5,8 +5,11 @@ mod functions;
 mod migrations;
 pub mod types;
 
-pub use functions::add_functions;
 pub use migrations::migrate;
+
+pub fn init_connection(conn: &Connection) -> anyhow::Result<()> {
+    functions::add_functions(conn)
+}
 
 pub fn auto_transaction<'a, T, E, F>(conn: &'a mut Connection, mut func: F) -> anyhow::Result<T>
 where

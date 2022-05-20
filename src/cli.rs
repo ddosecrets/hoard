@@ -51,7 +51,7 @@
 //! hoard file inspect --collection my-leaks /some-dir/file.txt
 //! ```
 use crate::config::Config;
-use crate::db::add_functions;
+use crate::db::init_connection;
 use crate::db::types::Collection;
 use crate::fs_utils::canonical_path;
 use crate::manager::Manager;
@@ -136,7 +136,7 @@ fn main_inner() -> anyhow::Result<()> {
     log::debug!("Set DB path to: {db_path}");
 
     let conn = Connection::open(db_path)?;
-    add_functions(&conn)?;
+    init_connection(&conn)?;
     let mut manager = Manager::new(config, conn);
 
     // TODO this logic is annoying but simplifies things in a few other places
