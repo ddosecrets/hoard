@@ -1,12 +1,19 @@
+use flate2::read::GzDecoder;
 use std::io::{Read, Seek};
 
 pub fn list_files<R: Read + Seek>(
     file_name: &str,
     reader: R,
 ) -> anyhow::Result<Vec<(String, u64)>> {
-    match file_name.split('.').last() {
-        Some("tar") => list_tar_files(reader),
-        Some("zip") => list_zip_files(reader),
+    let split = file_name.split('.').collect::<Vec<_>>();
+    match (split.len(), split[split.len() - 1]) {
+        (len, "gz") if len < 2 => Ok(Vec::new()),
+        (_, "gz") => match split[split.len() - 2] {
+            "tar" => list_tar_files(GzDecoder::new(reader)),
+            _ => Ok(Vec::new()),
+        },
+        (len, "tar") if len >= 2 => list_tar_files(reader),
+        (len, "zip") if len >= 2 => list_zip_files(reader),
         _ => Ok(Vec::new()),
     }
 }

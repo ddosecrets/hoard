@@ -506,6 +506,7 @@ dependencies = [
  "digest",
  "directories",
  "env_logger",
+ "flate2",
  "hex",
  "include_dir",
  "lazy_static",

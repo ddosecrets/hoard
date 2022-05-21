@@ -21,6 +21,7 @@ clap = { version = "^3.1.15", features = ["derive"] , optional = true }
 cli-table = { version = "^0.4.7", optional = true }
 digest = "^0.10.3"
 directories = "^4.0.1"
+flate2 = "^1.0.23"
 hex = "^0.4.3"
 include_dir = "^0.7.2"
 lazy_static = "^1.4.0"
