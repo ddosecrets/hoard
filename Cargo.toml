@@ -32,6 +32,7 @@ regex = "^1.5.5"
 # but the version on `master` has been bumped already
 # rusqlite = { version = "^0.27.0", default-features = false, features = ["chrono", "uuid"] }
 rusqlite = { git = "https://github.com/rusqlite/rusqlite.git", default-features = false, features = ["chrono", "functions", "uuid"] }
+rust-lzma = "^0.5.1"
 serde = { version = "^1.0", features = ["derive"] }
 serde_yaml = "^0.8.24"
 sha1 = "^0.10.1"

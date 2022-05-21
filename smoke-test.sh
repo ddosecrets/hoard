@@ -17,11 +17,13 @@ declare -r LOCAL_FILE='/tmp/a5b63c4b-25c7-48de-845f-2f887378c7cc.txt'
 declare -r LOCAL_TAR='/tmp/a5b63c4b-25c7-48de-845f-2f887378c7cc.tar'
 declare -r LOCAL_TAR_GZ='/tmp/a5b63c4b-25c7-48de-845f-2f887378c7cc.tar.gz'
 declare -r LOCAL_TGZ='/tmp/a5b63c4b-25c7-48de-845f-2f887378c7cc.tgz'
+declare -r LOCAL_TAR_XZ='/tmp/a5b63c4b-25c7-48de-845f-2f887378c7cc.tar.xz'
 declare -r VIRT_DIR='/some-dir'
 declare -r VIRT_FILE="$VIRT_DIR/my-super-cool-file.txt"
 declare -r VIRT_TAR="$VIRT_DIR/my-super-cool-file.tar"
 declare -r VIRT_TAR_GZ="$VIRT_DIR/my-super-cool-file.tar.gz"
 declare -r VIRT_TGZ="$VIRT_DIR/my-super-cool-file.tgz"
+declare -r VIRT_TAR_XZ="$VIRT_DIR/my-super-cool-file.tar.xz"
 
 run_and_log() {
     echo -e '\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n'
@@ -38,7 +40,7 @@ cargo build
 echo 'wat' > "$LOCAL_FILE"
 tar -cf "$LOCAL_TAR" "$LOCAL_FILE"
 tar -czf "$LOCAL_TAR_GZ" "$LOCAL_FILE"
-tar -czf "$LOCAL_TGZ" "$LOCAL_FILE"
+XZ_OPT='-0' tar -cJf "$LOCAL_TAR_XZ" "$LOCAL_FILE"
 
 run_and_log "${hoard[@]}" init
 run_and_log "${hoard[@]}" db migrate
@@ -53,6 +55,7 @@ run_and_log "${hoard[@]}" file add -c "$COLLECTION" "$LOCAL_FILE" "$VIRT_FILE"
 run_and_log "${hoard[@]}" file add -c "$COLLECTION" "$LOCAL_TAR" "$VIRT_TAR"
 run_and_log "${hoard[@]}" file add -c "$COLLECTION" "$LOCAL_TAR_GZ" "$VIRT_TAR_GZ"
 run_and_log "${hoard[@]}" file add -c "$COLLECTION" "$LOCAL_TGZ" "$VIRT_TGZ"
+run_and_log "${hoard[@]}" file add -c "$COLLECTION" "$LOCAL_TAR_XZ" "$VIRT_TAR_XZ"
 run_and_log "${hoard[@]}" file ls -c "$COLLECTION" "$VIRT_FILE"
 run_and_log "${hoard[@]}" file find -c "$COLLECTION" "$VIRT_DIR"
 run_and_log "${hoard[@]}" file inspect -c "$COLLECTION" "$VIRT_FILE"

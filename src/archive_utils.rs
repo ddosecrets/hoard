@@ -1,4 +1,5 @@
 use flate2::read::GzDecoder;
+use lzma::reader::LzmaReader;
 use std::io::{Read, Seek};
 
 pub fn list_files<R: Read + Seek>(
@@ -7,11 +8,16 @@ pub fn list_files<R: Read + Seek>(
 ) -> anyhow::Result<Vec<(String, u64)>> {
     let split = file_name.split('.').collect::<Vec<_>>();
     match (split.len(), split[split.len() - 1]) {
-        (len, "gz") if len < 2 => Ok(Vec::new()),
+        (len, "gz" | "xz") if len < 2 => Ok(Vec::new()),
         (_, "gz") => match split[split.len() - 2] {
             "tar" => list_tar_files(GzDecoder::new(reader)),
             _ => Ok(Vec::new()),
         },
+        (_, "xz") => match split[split.len() - 2] {
+            "tar" => list_tar_files(LzmaReader::new_decompressor(reader)?),
+            _ => Ok(Vec::new()),
+        },
+        (len, "tgz") if len >= 2 => list_tar_files(GzDecoder::new(reader)),
         (len, "tar") if len >= 2 => list_tar_files(reader),
         (len, "zip") if len >= 2 => list_zip_files(reader),
         _ => Ok(Vec::new()),
