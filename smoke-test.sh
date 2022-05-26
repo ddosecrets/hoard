@@ -42,6 +42,7 @@ cargo build
 echo 'wat' > "$LOCAL_FILE"
 tar -cf "$LOCAL_TAR" "$LOCAL_FILE"
 tar -czf "$LOCAL_TAR_GZ" "$LOCAL_FILE"
+tar -czf "$LOCAL_TGZ" "$LOCAL_FILE"
 XZ_OPT='-0' tar -cJf "$LOCAL_TAR_XZ" "$LOCAL_FILE"
 tar -I zstd -cf "$LOCAL_TAR_ZSTD" "$LOCAL_FILE"
 
