@@ -345,7 +345,7 @@ enum FileCmd {
         /// The name of the collection the files belongs to
         #[clap(long = "collection", short = 'c', value_name = "NAME")]
         collection_name: String,
-        /// Path or glob to files on the hoard disk pool
+        /// Path to files on the hoard disk pool
         // TODO min values here doesn't work (??)
         #[clap(value_name = "FILE", min_values = 1)]
         files: Vec<String>,

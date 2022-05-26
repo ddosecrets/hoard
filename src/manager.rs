@@ -329,15 +329,19 @@ impl Manager {
         Ok(output)
     }
 
-    pub fn find_files<'a, I: Iterator<Item = &'a str>>(
+    pub fn find_files<'a, I, II>(
         &self,
         collection_id: &Uuid,
         min_depth: Option<u32>,
         max_depth: Option<u32>,
         name: Option<&Regex>,
         path: Option<&Regex>,
-        files: I,
-    ) -> anyhow::Result<Vec<File>> {
+        files: II,
+    ) -> anyhow::Result<Vec<File>>
+    where
+        I: Iterator<Item = &'a str>,
+        II: IntoIterator<Item = &'a str, IntoIter = I>,
+    {
         match (min_depth, max_depth) {
             (Some(min), Some(max)) if min > max => {
                 bail!("Min depth ({min}) cannot be greater than max depth ({max})")

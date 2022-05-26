@@ -159,8 +159,8 @@ impl Partition {
         conn: &Connection,
         current_partition_uuids: &[&str],
     ) -> anyhow::Result<Option<Self>> {
-        // rusqlite doesn't have a nice syntax for doing `SELECT * FROM foo WHERE col IN ?`
-        // so instead we just query everything (a probably small number) and filter ourselves
+        // sqlite doesn't have a concept of arrays, so we have to pull everything and filter
+        // ourselves
         let mut stmt = conn.prepare("SELECT * FROM partitions ORDER BY random()")?;
         let mut rows = stmt
             .query_and_then([], Self::star_mapper)?
