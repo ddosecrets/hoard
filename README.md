@@ -21,7 +21,10 @@ hoard file ls -c vgtrk /some-leak/
 This currently only supports Linux.
 
 ```bash
-sudo apt install -y sqlite3 libudev-dev
+sudo apt install -y \
+    sqlite3 \
+    libudev-dev \
+    liblzma-dev
 ```
 
 You will need Rust and `cargo`, which can be gotten with [`rustup`](https://rustup.rs/).
@@ -29,7 +32,7 @@ You can build the release binary like so:
 
 ```bash
 cargo build --release
-mv target/release/hoard ~/bin/  # assumes ~/bin is on your $PATH
+mv target/release/hoard ~/.local/bin/  # assumes ~/.local/bin is on your $PATH
 hoard --help
 ```
 
