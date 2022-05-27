@@ -1,10 +1,11 @@
 use crate::db::types::Timestamp;
 use crate::db::unique_violation;
 use crate::dev_utils;
-use crate::sql_utils::add_array_to_query;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Row, Transaction};
+use std::rc::Rc;
 use uuid::Uuid;
 
 #[derive(Debug, PartialEq)]
@@ -162,15 +163,16 @@ impl Partition {
         conn: &Connection,
         current_partition_uuids: &[&str],
     ) -> anyhow::Result<Vec<Self>> {
-        // sqlite doesn't have a concept of arrays, so we have to pull everything and filter
-        // ourselves
-        let mut sql = "SELECT * FROM partitions WHERE uuid IN".to_string();
-        let mut params = Vec::new();
-        add_array_to_query(&mut sql, &mut params, current_partition_uuids.iter());
-
-        let mut stmt = conn.prepare(&sql)?;
+        let uuids = Rc::new(
+            current_partition_uuids
+                .iter()
+                .map(|id| Value::Text(id.to_string()))
+                .collect::<Vec<_>>(),
+        );
+        let mut stmt =
+            conn.prepare("SELECT * FROM partitions WHERE uuid IN rarray(?)")?;
         let mut rows = stmt
-            .query_and_then(&*params, Self::star_mapper)?
+            .query_and_then([uuids], Self::star_mapper)?
             .map(|r| r.map_err(Into::into))
             .collect::<Vec<anyhow::Result<Self>>>();
         rows.drain(..).collect::<anyhow::Result<Vec<Self>>>()

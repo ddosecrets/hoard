@@ -1,3 +1,5 @@
+use std::rc::Rc;
+use rusqlite::types::Value;
 use crate::config::FileConfig;
 use crate::db::auto_transaction;
 use crate::db::types::NewFileHash;
@@ -5,8 +7,7 @@ use crate::dev_utils;
 use crate::hash_utils::make_hashes;
 use crate::hash_utils::HashAlgorithm;
 use crate::manager::Manager;
-use crate::sql_utils::add_array_to_query;
-use rusqlite::{Connection, ToSql};
+use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use uuid::Uuid;
@@ -39,34 +40,23 @@ fn is_sync_hash_needed(
     algos: &[HashAlgorithm],
     collection_id: &Uuid,
 ) -> anyhow::Result<bool> {
-    let mut sql_array_str = String::new();
-    let mut params = Vec::new();
-
-    let algo_strs = algos.iter().map(|a| a.to_string()).collect::<Vec<_>>();
-    let algo_strs = algo_strs
-        .iter()
-        .map(|s| s as &dyn ToSql)
-        .collect::<Vec<_>>();
-
-    add_array_to_query(&mut sql_array_str, &mut params, &algo_strs);
-    let algo_len = algos.len();
-    params.push(collection_id);
-    params.push(&algo_len);
-    let sql = format!(
-        concat!(
-            "SELECT exists(",
-            "  SELECT f.id FROM files AS f",
-            "  LEFT OUTER JOIN file_hashes AS h",
-            "  ON f.id = h.file_id AND h.hash_algorithm IN {}",
-            "  WHERE f.collection_id = ?",
-            "  GROUP BY f.id HAVING count(h.file_id) != ?",
-            ")",
-        ),
-        sql_array_str, // just question marks, safe
+    let sql = concat!(
+        "SELECT exists(",
+        "  SELECT f.id FROM files AS f",
+        "  LEFT OUTER JOIN file_hashes AS h",
+        "  ON f.id = h.file_id AND h.hash_algorithm IN rarray(:algorithms)",
+        "  WHERE f.collection_id = :collection_id",
+        "  GROUP BY f.id HAVING count(h.file_id) != :expected_count",
+        ")",
     );
-
     log::trace!("SQL:\n{}", sql);
 
+    let algos = Rc::new(algos.iter().map(|a| Value::Text(a.to_string())).collect::<Vec<_>>());
+    let params = named_params! {
+        ":algorithms": algos,
+        ":collection_id": collection_id,
+        ":expected_count": algos.len(),
+    };
     let mut stmt = conn.prepare(&sql)?;
     stmt.query_row(&*params, |row| row.get(0))
         .map_err(Into::into)
@@ -77,47 +67,37 @@ fn get_missing_hashes(
     algos: &[HashAlgorithm],
     collection_id: &Uuid,
 ) -> anyhow::Result<HashBucket> {
-    let mut sql_array_str = String::new();
-    let mut params = Vec::new();
-
-    let algo_strs = algos.iter().map(|a| a.to_string()).collect::<Vec<_>>();
-    let algo_strs = algo_strs
-        .iter()
-        .map(|s| s as &dyn ToSql)
-        .collect::<Vec<_>>();
-
-    add_array_to_query(&mut sql_array_str, &mut params, &algo_strs);
-    let algo_len = algos.len();
-    params.push(collection_id);
-    params.push(&algo_len);
-    let sql = format!(
-        concat!(
-            "SELECT f.id AS file_id, f.path AS file_path, p.partition_id AS partition_id, ",
-            "       pa.uuid AS partition_uuid, h.hash_algorithm AS hash_algorithm ",
-            "FROM (",
-            // subquery to give us the file IDs
-            "  SELECT f.id AS id, f.path AS path FROM files AS f",
-            "  LEFT OUTER JOIN file_hashes AS h",
-            "  ON f.id = h.file_id AND h.hash_algorithm IN {}",
-            "  WHERE f.collection_id = ?",
-            "  GROUP BY f.id, f.path",
-            "  HAVING count(h.file_id) != ?",
-            ") AS f ",
-            // this inner join assumes there is at least one placement
-            "INNER JOIN file_placements AS p ",
-            "ON p.file_id = f.id ",
-            "INNER JOIN partitions AS pa ",
-            "ON pa.id = p.partition_id ",
-            "LEFT OUTER JOIN file_hashes AS h ",
-            "ON h.file_id = f.id",
-        ),
-        sql_array_str, // just question marks, safe
+    let sql = concat!(
+        "SELECT f.id AS file_id, f.path AS file_path, p.partition_id AS partition_id, ",
+        "       pa.uuid AS partition_uuid, h.hash_algorithm AS hash_algorithm ",
+        "FROM (",
+        // subquery to give us the file IDs
+        "  SELECT f.id AS id, f.path AS path FROM files AS f",
+        "  LEFT OUTER JOIN file_hashes AS h",
+        "  ON f.id = h.file_id AND h.hash_algorithm IN rarray(:algorithms)",
+        "  WHERE f.collection_id = :collection_id",
+        "  GROUP BY f.id, f.path",
+        "  HAVING count(h.file_id) != :expected_count",
+        ") AS f ",
+        // this inner join assumes there is at least one placement
+        "INNER JOIN file_placements AS p ",
+        "ON p.file_id = f.id ",
+        "INNER JOIN partitions AS pa ",
+        "ON pa.id = p.partition_id ",
+        "LEFT OUTER JOIN file_hashes AS h ",
+        "ON h.file_id = f.id",
     );
-
     log::trace!("SQL:\n{}", sql);
 
+    let algos_value = Rc::new(algos.iter().map(|a| Value::Text(a.to_string())).collect::<Vec<_>>());
+    let params = named_params! {
+        ":algorithms": algos_value,
+        ":collection_id": collection_id,
+        ":expected_count": algos.len(),
+    };
+
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map(&*params, |row| {
+    let rows = stmt.query_map(params, |row| {
         Ok((
             (
                 row.get::<_, Uuid>("file_id")?,

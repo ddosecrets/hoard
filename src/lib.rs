@@ -40,7 +40,6 @@ mod error;
 mod fs_utils;
 mod hash_utils;
 mod manager;
-mod sql_utils;
 mod sync_db;
 #[cfg(test)]
 mod test_utils;
