@@ -26,6 +26,7 @@ impl Disk {
     }
 }
 
+#[derive(Debug)]
 pub struct Partition {
     uuid: String,
     mount_point: PathBuf,

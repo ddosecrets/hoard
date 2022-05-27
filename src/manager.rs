@@ -280,6 +280,8 @@ impl Manager {
 
     fn random_partition(&self) -> anyhow::Result<(Partition, dev_utils::Partition)> {
         let mut partitions = dev_utils::get_all_partitions()?;
+        log::trace!("Current partitions: {:#?}", partitions);
+
         let partition_ids = partitions.iter().map(|p| p.uuid()).collect::<Vec<_>>();
         match Partition::random(&self.conn, &partition_ids)? {
             Some(db_part) => {
@@ -289,7 +291,10 @@ impl Manager {
                     .unwrap();
                 Ok((db_part, part))
             }
-            None => bail!("There are no partitions in the database. Try adding one?"),
+            None => bail!(concat!(
+                "No currently mounted partitions were found in the DB. ",
+                "Try mounting one or adding one to the DB.",
+            ),),
         }
     }
 
