@@ -4,6 +4,8 @@ A tool to allow data hoarders to split data sets across a pool of offline extern
 
 > I want to manage 100TB of static data sets across my shelf full of hard drives in a way that won't enrage me.
 
+**WARNING: alpha software**
+
 ## Basic Usage
 
 ```bash
