@@ -3,6 +3,7 @@ use std::fs::File;
 use std::path::Path;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
 pub struct Config {
     db: DbConfig,
     files: FileConfig,
@@ -23,6 +24,7 @@ impl Config {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
 pub struct DbConfig {
     path: String,
 }
@@ -42,6 +44,7 @@ impl Default for DbConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     hashes: Vec<HashAlgorithm>,
 }
