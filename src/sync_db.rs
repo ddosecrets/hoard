@@ -1,5 +1,3 @@
-use std::rc::Rc;
-use rusqlite::types::Value;
 use crate::config::FileConfig;
 use crate::db::auto_transaction;
 use crate::db::types::NewFileHash;
@@ -7,9 +5,11 @@ use crate::dev_utils;
 use crate::hash_utils::make_hashes;
 use crate::hash_utils::HashAlgorithm;
 use crate::manager::Manager;
+use rusqlite::types::Value;
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::rc::Rc;
 use uuid::Uuid;
 
 pub fn sync_db(
@@ -51,13 +51,18 @@ fn is_sync_hash_needed(
     );
     log::trace!("SQL:\n{}", sql);
 
-    let algos = Rc::new(algos.iter().map(|a| Value::Text(a.to_string())).collect::<Vec<_>>());
+    let algos = Rc::new(
+        algos
+            .iter()
+            .map(|a| Value::Text(a.to_string()))
+            .collect::<Vec<_>>(),
+    );
     let params = named_params! {
         ":algorithms": algos,
         ":collection_id": collection_id,
         ":expected_count": algos.len(),
     };
-    let mut stmt = conn.prepare(&sql)?;
+    let mut stmt = conn.prepare(sql)?;
     stmt.query_row(&*params, |row| row.get(0))
         .map_err(Into::into)
 }
@@ -89,14 +94,19 @@ fn get_missing_hashes(
     );
     log::trace!("SQL:\n{}", sql);
 
-    let algos_value = Rc::new(algos.iter().map(|a| Value::Text(a.to_string())).collect::<Vec<_>>());
+    let algos_value = Rc::new(
+        algos
+            .iter()
+            .map(|a| Value::Text(a.to_string()))
+            .collect::<Vec<_>>(),
+    );
     let params = named_params! {
         ":algorithms": algos_value,
         ":collection_id": collection_id,
         ":expected_count": algos.len(),
     };
 
-    let mut stmt = conn.prepare(&sql)?;
+    let mut stmt = conn.prepare(sql)?;
     let rows = stmt.query_map(params, |row| {
         Ok((
             (

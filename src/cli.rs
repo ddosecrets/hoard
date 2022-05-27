@@ -363,6 +363,14 @@ enum FileCmd {
         #[clap(long = "all", short = 'a')]
         all: bool,
     },
+    Path {
+        /// The name of the collection the files belongs to
+        #[clap(long = "collection", short = 'c', value_name = "NAME")]
+        collection_name: String,
+        /// Path to files on the hoard disk pool
+        #[clap(value_name = "FILE")]
+        file: String,
+    },
 }
 
 impl FileCmd {
@@ -429,6 +437,15 @@ impl FileCmd {
                     // e.g., `ls /foo/` should return only `bar` if `/foo/bar` exists
                     println!("{}", file.path());
                 }
+                Ok(())
+            }
+            Self::Path {
+                collection_name,
+                file,
+            } => {
+                let collection = get_collection(manager.conn(), collection_name)?;
+                let path = manager.file_mounted_path(collection.id(), file)?;
+                println!("{}", path);
                 Ok(())
             }
         }

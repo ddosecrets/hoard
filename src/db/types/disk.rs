@@ -169,8 +169,7 @@ impl Partition {
                 .map(|id| Value::Text(id.to_string()))
                 .collect::<Vec<_>>(),
         );
-        let mut stmt =
-            conn.prepare("SELECT * FROM partitions WHERE uuid IN rarray(?)")?;
+        let mut stmt = conn.prepare("SELECT * FROM partitions WHERE uuid IN rarray(?)")?;
         let mut rows = stmt
             .query_and_then([uuids], Self::star_mapper)?
             .map(|r| r.map_err(Into::into))

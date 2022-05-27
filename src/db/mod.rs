@@ -8,7 +8,7 @@ pub mod types;
 pub use migrations::migrate;
 
 pub fn init_connection(conn: &Connection) -> anyhow::Result<()> {
-    rusqlite::vtab::array::load_module(&conn)?;
+    rusqlite::vtab::array::load_module(conn)?;
     functions::add_functions(conn)
 }
 

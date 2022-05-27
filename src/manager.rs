@@ -11,11 +11,13 @@ use crate::fs_utils::{canonical_path, create_dirs_from, strip_root};
 use crate::hash_utils::make_hashes;
 use crate::sync_db::sync_db;
 use regex::Regex;
+use rusqlite::types::Value;
 use rusqlite::Connection;
 use serde::Serialize;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use uuid::Uuid;
 
 pub struct Manager {
@@ -425,6 +427,48 @@ impl Manager {
         };
 
         Ok(serde_yaml::to_string(&disp)?)
+    }
+
+    pub fn file_mounted_path(&self, collection_id: &Uuid, path: &str) -> anyhow::Result<String> {
+        let current_partitions = dev_utils::get_all_partitions()?;
+        let uuids = Rc::new(
+            current_partitions
+                .iter()
+                .map(|p| Value::Text(p.uuid().to_string()))
+                .collect::<Vec<_>>(),
+        );
+
+        let file = File::get_by_collection_and_path(&self.conn, collection_id, path)?
+            .ok_or_else(|| anyhow!("Path not found"))?;
+
+        let sql = concat!(
+            "SELECT p.uuid FROM partitions AS p ",
+            "INNER JOIN file_placements AS fp ON fp.partition_id = p.id ",
+            "INNER JOIN files AS f ON f.id = fp.file_id ",
+            "WHERE p.uuid IN rarray(:uuids) AND f.id = :file_id",
+        );
+        log::trace!("SQL:\n{}", sql);
+
+        let params = named_params! {
+            ":uuids": uuids,
+            ":file_id": file.id(),
+        };
+        let mut stmt = self.conn.prepare(sql)?;
+        let db_part_uuids = stmt.query_and_then(params, |row| row.get::<_, String>(0))?;
+        for db_part_uuid in db_part_uuids {
+            let db_part_uuid = db_part_uuid?;
+            for dev_part in &current_partitions {
+                if dev_part.uuid() == db_part_uuid {
+                    let target_path = Self::path_on_partition(collection_id, path)?;
+                    let full_path = dev_part.mount_point().join(&target_path);
+                    let full_path = full_path
+                        .to_str()
+                        .ok_or_else(|| anyhow!("Path was not utf-8"))?;
+                    return Ok(full_path.to_owned());
+                }
+            }
+        }
+        bail!("Could not find a mounted partition for that path.")
     }
 
     pub fn sync_db(&mut self, collection_id: &Uuid) -> anyhow::Result<()> {
