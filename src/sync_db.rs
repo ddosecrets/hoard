@@ -262,7 +262,7 @@ mod tests {
     #[test_log::test]
     fn is_sync_hash_needed_empty_tables() {
         let conn = fixtures::db();
-        assert!(is_sync_hash_needed(&conn, &[HashAlgorithm::Sha1], &Uuid::new_v4()).unwrap(),);
+        assert!(!is_sync_hash_needed(&conn, &[HashAlgorithm::Sha1], &Uuid::new_v4()).unwrap());
     }
 
     #[test_log::test]
@@ -271,7 +271,7 @@ mod tests {
         let coll = fixtures::collection(&mut conn);
         let file = fixtures::file(&mut conn, &coll);
         let file_hash = fixtures::file_hash(&mut conn, &file);
-        assert!(!is_sync_hash_needed(&conn, &[file_hash.hash_algorithm()], coll.id()).unwrap(),);
+        assert!(!is_sync_hash_needed(&conn, &[file_hash.hash_algorithm()], coll.id()).unwrap());
     }
 
     #[test_log::test]
