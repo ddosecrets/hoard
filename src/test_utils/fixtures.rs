@@ -1,10 +1,11 @@
 use crate::config::Config;
 use crate::db::init_connection;
 use crate::db::types::{
-    Collection, Disk, File, NewCollection, NewDisk, NewFile, NewFileHash, NewFilePlacement,
-    NewPartition, Partition,
+    Collection, Disk, File, FileHash, FilePlacement, NewCollection, NewDisk, NewFile, NewFileHash,
+    NewFilePlacement, NewPartition, Partition,
 };
 use crate::db::{auto_transaction, migrate};
+use crate::hash_utils::HashAlgorithm;
 use crate::manager::Manager;
 use rusqlite::Connection;
 use std::fs;
@@ -73,7 +74,30 @@ pub fn file(conn: &mut Connection, collection: &Collection) -> File {
     File::for_id(conn, &id).unwrap().unwrap()
 }
 
-pub fn file_full(conn: &mut Connection, partition: &Partition, collection: &Collection) -> File {
+pub fn file_hash(conn: &mut Connection, file: &File) -> FileHash {
+    let alg = HashAlgorithm::Sha1;
+    auto_transaction::<'_, _, anyhow::Error, _>(conn, |tx| {
+        NewFileHash {
+            file_id: file.id(),
+            hash_algorithm: &alg,
+            hash_value: &[1, 3, 1, 2],
+        }
+        .insert(tx)
+    })
+    .unwrap();
+
+    FileHash::get_by_file_id(conn, file.id())
+        .unwrap()
+        .drain(..)
+        .next()
+        .unwrap()
+}
+
+pub fn file_full(
+    conn: &mut Connection,
+    partition: &Partition,
+    collection: &Collection,
+) -> (File, Vec<FilePlacement>, Vec<FileHash>) {
     let id = auto_transaction::<'_, _, anyhow::Error, _>(conn, |tx| {
         let file_id = NewFile {
             collection_id: collection.id(),
@@ -84,7 +108,7 @@ pub fn file_full(conn: &mut Connection, partition: &Partition, collection: &Coll
 
         NewFileHash {
             file_id: &file_id,
-            hash_algorithm: "sha256",
+            hash_algorithm: &HashAlgorithm::Sha256,
             hash_value: b"a1c3a1b2",
         }
         .insert(tx)?;
@@ -98,5 +122,9 @@ pub fn file_full(conn: &mut Connection, partition: &Partition, collection: &Coll
         Ok(file_id)
     })
     .unwrap();
-    File::for_id(conn, &id).unwrap().unwrap()
+    (
+        File::for_id(conn, &id).unwrap().unwrap(),
+        FilePlacement::get_by_file_id(conn, &id).unwrap(),
+        FileHash::get_by_file_id(conn, &id).unwrap(),
+    )
 }

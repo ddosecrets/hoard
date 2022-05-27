@@ -27,6 +27,7 @@ include_dir = "^0.7.2"
 lazy_static = "^1.4.0"
 log = "^0.4.17"
 nix = { version = "^0.24.1", default-features = false, features = ["fs"] }
+rand = "^0.8.5"
 regex = "^1.5.5"
 # crates.io version depends on uuid v0.8.x and cause compilation errors,
 # but the version on `master` has been bumped already

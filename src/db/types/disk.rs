@@ -1,6 +1,9 @@
 use crate::db::types::Timestamp;
 use crate::db::unique_violation;
 use crate::dev_utils;
+use crate::sql_utils::add_array_to_query;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use rusqlite::{Connection, OptionalExtension, Row, Transaction};
 use uuid::Uuid;
 
@@ -112,7 +115,7 @@ impl<'a> NewDisk<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "cli", derive(Table))]
 pub struct Partition {
     #[cfg_attr(feature = "cli", table(title = "ID"))]
@@ -155,24 +158,31 @@ impl Partition {
         .map_err(Into::into)
     }
 
+    pub fn current(
+        conn: &Connection,
+        current_partition_uuids: &[&str],
+    ) -> anyhow::Result<Vec<Self>> {
+        // sqlite doesn't have a concept of arrays, so we have to pull everything and filter
+        // ourselves
+        let mut sql = "SELECT * FROM partitions WHERE uuid IN".to_string();
+        let mut params = Vec::new();
+        add_array_to_query(&mut sql, &mut params, current_partition_uuids.iter());
+
+        let mut stmt = conn.prepare(&sql)?;
+        let mut rows = stmt
+            .query_and_then(&*params, Self::star_mapper)?
+            .map(|r| r.map_err(Into::into))
+            .collect::<Vec<anyhow::Result<Self>>>();
+        rows.drain(..).collect::<anyhow::Result<Vec<Self>>>()
+    }
+
     pub fn random(
         conn: &Connection,
         current_partition_uuids: &[&str],
     ) -> anyhow::Result<Option<Self>> {
-        // sqlite doesn't have a concept of arrays, so we have to pull everything and filter
-        // ourselves
-        let mut stmt = conn.prepare("SELECT * FROM partitions ORDER BY random()")?;
-        let mut rows = stmt
-            .query_and_then([], Self::star_mapper)?
-            .map(|r| r.map_err(Into::into))
-            .collect::<Vec<anyhow::Result<Self>>>();
-        let mut mapped_rows = rows.drain(..).collect::<anyhow::Result<Vec<Self>>>()?;
-        let found = mapped_rows.drain(..).find(|part| {
-            current_partition_uuids
-                .iter()
-                .any(|pid| *pid == part.uuid())
-        });
-        Ok(found)
+        let choices = Self::current(conn, current_partition_uuids)?;
+        let mut rng = thread_rng();
+        Ok(choices.choose(&mut rng).cloned())
     }
 
     pub fn all(conn: &Connection) -> anyhow::Result<Vec<Self>> {
@@ -270,5 +280,21 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![part_id]
         );
+    }
+
+    #[test]
+    fn current_partitions_none() {
+        let conn = fixtures::db();
+        let current = Partition::current(&conn, &["abc"]).unwrap();
+        assert_eq!(&current, &[]);
+    }
+
+    #[test]
+    fn current_partitions_some() {
+        let mut conn = fixtures::db();
+        let disk = fixtures::disk(&mut conn);
+        let partition = fixtures::partition(&mut conn, &disk);
+        let current = Partition::current(&conn, &[partition.uuid()]).unwrap();
+        assert_eq!(&current, &[partition]);
     }
 }

@@ -1,21 +1,34 @@
+use crate::error::GenericError;
 use digest::Digest;
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef};
+use rusqlite::ToSql;
 use sha1::Sha1;
 use sha2::{Sha256, Sha384, Sha512};
 use sha3::{Sha3_256, Sha3_384, Sha3_512};
 use std::collections::HashMap;
+use std::fmt;
 use std::io::Read;
+use std::iter::ExactSizeIterator;
 
-pub fn make_hashes<R: Read>(
+pub fn make_hashes<'a, R: Read, I, II>(
     mut input: R,
-    hash_algorithms: &[HashAlgorithm],
-) -> anyhow::Result<HashMap<HashAlgorithm, Vec<u8>>> {
-    if hash_algorithms.is_empty() {
+    hash_algorithms: II,
+) -> anyhow::Result<HashMap<&'a HashAlgorithm, Vec<u8>>>
+where
+    I: ExactSizeIterator<Item = &'a HashAlgorithm>,
+    II: IntoIterator<IntoIter = I, Item = &'a HashAlgorithm>,
+{
+    let hash_algorithms = hash_algorithms.into_iter();
+
+    // TODO make this use `is_empty` once this feature stabilizes:
+    // https://github.com/rust-lang/rust/issues/35428
+    if hash_algorithms.len() == 0 {
         return Ok(HashMap::new());
     }
 
     let mut hashes = HashMap::new();
     for name in hash_algorithms {
-        hashes.insert(*name, name.container());
+        hashes.insert(name, name.container());
     }
 
     let mut buf = vec![0u8; 4096];
@@ -67,9 +80,9 @@ impl HashAlgorithm {
     }
 }
 
-impl ToString for HashAlgorithm {
-    fn to_string(&self) -> String {
-        match self {
+impl fmt::Display for HashAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let val = match self {
             Self::Sha1 => "sha1".to_string(),
             Self::Sha256 => "sha2-256".to_string(),
             Self::Sha384 => "sha2-384".to_string(),
@@ -77,6 +90,45 @@ impl ToString for HashAlgorithm {
             Self::Sha3_256 => "sha3-256".to_string(),
             Self::Sha3_384 => "sha3-384".to_string(),
             Self::Sha3_512 => "sha3-512".to_string(),
+        };
+        write!(f, "{}", val)
+    }
+}
+
+impl TryFrom<&str> for HashAlgorithm {
+    type Error = GenericError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "sha1" => Ok(Self::Sha1),
+            "sha2-256" => Ok(Self::Sha256),
+            "sha2-384" => Ok(Self::Sha384),
+            "sha2-512" => Ok(Self::Sha512),
+            "sha3-256" => Ok(Self::Sha3_256),
+            "sha3-384" => Ok(Self::Sha3_384),
+            "sha3-512" => Ok(Self::Sha3_512),
+            x => Err(GenericError::new(format!(
+                "Not a known hash algorithm: {x}"
+            ))),
+        }
+    }
+}
+
+impl ToSql for HashAlgorithm {
+    #[inline]
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.to_string()))
+    }
+}
+
+impl FromSql for HashAlgorithm {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        match value {
+            ValueRef::Text(bytes) => ::std::str::from_utf8(bytes)
+                .map_err(|e| FromSqlError::Other(Box::new(e)))?
+                .try_into()
+                .map_err(|e| FromSqlError::Other(Box::new(e))),
+            _ => Err(FromSqlError::InvalidType),
         }
     }
 }

@@ -9,6 +9,7 @@ use crate::db::{auto_transaction, migrate};
 use crate::dev_utils::{self, get_disk_for_path, get_partition_for_path, get_partition_for_uuid};
 use crate::fs_utils::{canonical_path, create_dirs_from, strip_root};
 use crate::hash_utils::make_hashes;
+use crate::sync_db::sync_db;
 use regex::Regex;
 use rusqlite::Connection;
 use serde::Serialize;
@@ -194,7 +195,7 @@ impl Manager {
         collection_id: &Uuid,
         dest_path: &Path,
     ) -> anyhow::Result<PathBuf> {
-        let target_path = Self::virtual_path(collection_id, dest_path)?;
+        let target_path = Self::path_on_partition(collection_id, dest_path)?;
         let target_dir = target_path.parent().ok_or_else(|| {
             anyhow!(
                 "Unable to find parent directory for {}",
@@ -236,7 +237,7 @@ impl Manager {
             for (hash_algorithm, hash_value) in hashes.iter() {
                 NewFileHash {
                     file_id: &file_id,
-                    hash_algorithm: hash_algorithm.to_string().as_str(),
+                    hash_algorithm,
                     hash_value,
                 }
                 .insert(tx)?;
@@ -272,9 +273,14 @@ impl Manager {
         })
     }
 
-    fn virtual_path(collection_id: &Uuid, dest_path: &Path) -> anyhow::Result<PathBuf> {
+    // TODO should probably move this out of the manager
+    pub fn path_on_partition(
+        collection_id: &Uuid,
+        dest_path: impl AsRef<Path>,
+    ) -> anyhow::Result<PathBuf> {
         let root = PathBuf::from(format!("hoard/collections/{}", collection_id.hyphenated()));
-        let virt_path = canonical_path(dest_path.as_os_str()).map_err(|e| anyhow!("{}", e))?;
+        let virt_path =
+            canonical_path(dest_path.as_ref().as_os_str()).map_err(|e| anyhow!("{}", e))?;
         Ok(root.join(strip_root(virt_path)))
     }
 
@@ -420,6 +426,10 @@ impl Manager {
 
         Ok(serde_yaml::to_string(&disp)?)
     }
+
+    pub fn sync_db(&mut self, collection_id: &Uuid) -> anyhow::Result<()> {
+        sync_db(self.config.files(), &mut self.conn, collection_id)
+    }
 }
 
 #[derive(Serialize)]
@@ -521,7 +531,7 @@ mod tests {
         let disk = fixtures::disk(&mut manager.conn);
         let partition = fixtures::partition(&mut manager.conn, &disk);
         let coll = fixtures::collection(&mut manager.conn);
-        let file = fixtures::file_full(&mut manager.conn, &partition, &coll);
+        let (file, _, _) = fixtures::file_full(&mut manager.conn, &partition, &coll);
         manager.inspect_file(coll.id(), file.path()).unwrap();
     }
 }

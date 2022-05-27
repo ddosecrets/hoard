@@ -25,6 +25,7 @@ This currently only supports Linux.
 ```bash
 sudo apt install -y \
     sqlite3 \
+    libsqlite3-dev \
     libudev-dev \
     liblzma-dev
 ```

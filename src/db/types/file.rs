@@ -1,5 +1,6 @@
 use crate::db::types::Timestamp;
 use crate::db::unique_violation;
+use crate::hash_utils::HashAlgorithm;
 use regex::Regex;
 use rusqlite::{Connection, OptionalExtension, Row, ToSql, Transaction};
 use uuid::Uuid;
@@ -243,14 +244,14 @@ impl<'a> NewFilePlacement<'a> {
 
 #[derive(Debug, PartialEq)]
 pub struct FileHash {
-    pub file_id: Uuid,
-    pub hash_algorithm: String,
-    pub hash_value: Vec<u8>,
+    file_id: Uuid,
+    hash_algorithm: HashAlgorithm,
+    hash_value: Vec<u8>,
 }
 
 impl FileHash {
-    pub fn hash_algorithm(&self) -> &str {
-        &self.hash_algorithm
+    pub fn hash_algorithm(&self) -> HashAlgorithm {
+        self.hash_algorithm
     }
 
     pub fn hash_value_hex(&self) -> String {
@@ -278,7 +279,7 @@ impl FileHash {
 #[derive(Debug, PartialEq)]
 pub struct NewFileHash<'a> {
     pub file_id: &'a Uuid,
-    pub hash_algorithm: &'a str,
+    pub hash_algorithm: &'a HashAlgorithm,
     pub hash_value: &'a [u8],
 }
 
@@ -374,7 +375,7 @@ mod tests {
         let file = fixtures::file(&mut conn, &coll);
         let new_hash = NewFileHash {
             file_id: file.id(),
-            hash_algorithm: "sha1",
+            hash_algorithm: &HashAlgorithm::Sha256,
             hash_value: b"1337",
         };
         auto_transaction(&mut conn, |tx| new_hash.insert(tx)).unwrap();

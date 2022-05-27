@@ -153,6 +153,10 @@ fn main_inner() -> anyhow::Result<()> {
         Command::Init => Ok(()), // this was already handled
         Command::File(cmd) => cmd.run(&mut manager),
         Command::Partition(cmd) => cmd.run(&mut manager),
+        Command::Sync { collection_name } => {
+            let collection = get_collection(manager.conn(), &collection_name)?;
+            manager.sync_db(collection.id())
+        }
     }
 }
 
@@ -220,6 +224,12 @@ enum Command {
     /// Manage partitions on physical disks
     #[clap(subcommand)]
     Partition(PartitionCmd),
+    /// Sync the DB
+    Sync {
+        /// The name of the collection to sync
+        #[clap(long = "collection", short = 'c', value_name = "NAME")]
+        collection_name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
