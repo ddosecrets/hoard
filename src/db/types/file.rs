@@ -344,7 +344,6 @@ mod tests {
     fn file_insert_and_fetch() {
         let mut conn = fixtures::db();
         let coll = fixtures::collection(&mut conn);
-        let mut conn = fixtures::db();
         let new_file = NewFile {
             collection_id: coll.id(),
             path: "/foo",
