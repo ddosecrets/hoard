@@ -282,7 +282,8 @@ mod tests {
     fn get_hashes_all_present() {
         let mut conn = fixtures::db();
         let coll = fixtures::collection(&mut conn);
-        let disk = fixtures::disk(&mut conn);
+        let loc = fixtures::location(&mut conn);
+        let disk = fixtures::disk(&mut conn, &loc);
         let part = fixtures::partition(&mut conn, &disk);
         let (_, _, hashes) = fixtures::file_full(&mut conn, &part, &coll);
         let bucket = get_missing_hashes(&conn, &[hashes[0].hash_algorithm()], coll.id()).unwrap();
@@ -297,7 +298,8 @@ mod tests {
     fn get_hashes_one_missing() {
         let mut conn = fixtures::db();
         let coll = fixtures::collection(&mut conn);
-        let disk = fixtures::disk(&mut conn);
+        let loc = fixtures::location(&mut conn);
+        let disk = fixtures::disk(&mut conn, &loc);
         let part = fixtures::partition(&mut conn, &disk);
         let (file, placements, hashes) = fixtures::file_full(&mut conn, &part, &coll);
         let other_hash = HashAlgorithm::Sha3_256;

@@ -1,8 +1,8 @@
 use crate::config::Config;
 use crate::db::init_connection;
 use crate::db::types::{
-    Collection, Disk, File, FileHash, FilePlacement, NewCollection, NewDisk, NewFile, NewFileHash,
-    NewFilePlacement, NewPartition, Partition,
+    Collection, Disk, File, FileHash, FilePlacement, Location, NewCollection, NewDisk, NewFile,
+    NewFileHash, NewFilePlacement, NewLocation, NewPartition, Partition,
 };
 use crate::db::{auto_transaction, migrate};
 use crate::hash_utils::HashAlgorithm;
@@ -25,10 +25,22 @@ pub fn manager() -> Manager {
     Manager::new(config(), db())
 }
 
-pub fn disk(conn: &mut Connection) -> Disk {
+pub fn location(conn: &mut Connection) -> Location {
+    let id = auto_transaction::<'_, _, anyhow::Error, _>(conn, |tx| {
+        NewLocation {
+            name: "test-location",
+        }
+        .insert(tx)
+    })
+    .unwrap();
+    Location::for_id(conn, &id).unwrap().unwrap()
+}
+
+pub fn disk(conn: &mut Connection, location: &Location) -> Disk {
     let id = auto_transaction::<'_, _, anyhow::Error, _>(conn, |tx| {
         NewDisk {
             label: "test-disk",
+            location_id: location.id(),
             serial_number: "some-serial-123",
         }
         .insert(tx)

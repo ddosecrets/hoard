@@ -357,7 +357,8 @@ mod tests {
     fn file_placement_insert() {
         let mut conn = fixtures::db();
         let coll = fixtures::collection(&mut conn);
-        let disk = fixtures::disk(&mut conn);
+        let loc = fixtures::location(&mut conn);
+        let disk = fixtures::disk(&mut conn, &loc);
         let partition = fixtures::partition(&mut conn, &disk);
         let file = fixtures::file(&mut conn, &coll);
         let new_placement = NewFilePlacement {

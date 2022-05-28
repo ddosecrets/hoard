@@ -12,6 +12,7 @@ declare -ra hoard=(
 )
 
 declare -r SQLITE_DB='./db.sqlite'
+declare -r LOCATION='area-161'
 declare -r COLLECTION='some-collection'
 declare -r LOCAL_FILE='/tmp/a5b63c4b-25c7-48de-845f-2f887378c7cc.txt'
 declare -r LOCAL_TAR='/tmp/a5b63c4b-25c7-48de-845f-2f887378c7cc.tar'
@@ -49,7 +50,9 @@ run_and_log "${hoard[@]}" db migrate
 run_and_log "${hoard[@]}" db vacuum
 run_and_log "${hoard[@]}" collection add "$COLLECTION"
 run_and_log "${hoard[@]}" collection ls
-run_and_log "${hoard[@]}" disk add --label 'my-disk' "$DISK_PATH"
+run_and_log "${hoard[@]}" location add "$LOCATION"
+run_and_log "${hoard[@]}" location ls
+run_and_log "${hoard[@]}" disk add --location "$LOCATION" --label 'my-disk' "$DISK_PATH"
 run_and_log "${hoard[@]}" disk ls 
 run_and_log "${hoard[@]}" partition add "$PARTITION_PATH"
 run_and_log "${hoard[@]}" partition ls

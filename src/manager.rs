@@ -2,8 +2,8 @@ use crate::archive_utils;
 use crate::config::Config;
 use crate::db::init_connection;
 use crate::db::types::{
-    Collection, Disk, File, FileHash, FilePlacement, NewCollection, NewDisk, NewFile,
-    NewFileArchive, NewFileHash, NewFilePlacement, NewPartition, Partition,
+    Collection, Disk, File, FileHash, FilePlacement, Location, NewCollection, NewDisk, NewFile,
+    NewFileArchive, NewFileHash, NewFilePlacement, NewLocation, NewPartition, Partition,
 };
 use crate::db::{auto_transaction, migrate};
 use crate::dev_utils::{self, get_disk_for_path, get_partition_for_path, get_partition_for_uuid};
@@ -72,6 +72,18 @@ impl Manager {
         self.conn.execute_batch("VACUUM").map_err(Into::into)
     }
 
+    pub fn add_location(&mut self, name: &str) -> anyhow::Result<()> {
+        auto_transaction(&mut self.conn, |tx| {
+            NewLocation { name }.insert(tx).map(|_| ())
+        })?;
+        log::info!("Location added: {name}");
+        Ok(())
+    }
+
+    pub fn list_locations(&self) -> anyhow::Result<Vec<Location>> {
+        Location::all(&self.conn)
+    }
+
     pub fn add_collection(&mut self, name: &str) -> anyhow::Result<()> {
         auto_transaction(&mut self.conn, |tx| {
             NewCollection { name }.insert(tx).map(|_| ())
@@ -84,10 +96,16 @@ impl Manager {
         Collection::all(&self.conn)
     }
 
-    pub fn add_disk(&mut self, disk_path: &str, label: &str) -> anyhow::Result<()> {
+    pub fn add_disk(
+        &mut self,
+        location_id: &Uuid,
+        disk_path: &str,
+        label: &str,
+    ) -> anyhow::Result<()> {
         let disk = get_disk_for_path(disk_path)?;
         auto_transaction(&mut self.conn, |tx| {
             NewDisk {
+                location_id,
                 serial_number: disk.serial_number(),
                 label,
             }
@@ -528,6 +546,12 @@ mod tests {
     }
 
     #[test_log::test]
+    fn add_location() {
+        let mut manager = fixtures::manager();
+        manager.add_location("foo").unwrap();
+    }
+
+    #[test_log::test]
     fn add_collection() {
         let mut manager = fixtures::manager();
         manager.add_collection("foo").unwrap();
@@ -544,7 +568,8 @@ mod tests {
     #[test_log::test]
     fn list_disks() {
         let mut manager = fixtures::manager();
-        let _ = fixtures::disk(&mut manager.conn);
+        let loc = fixtures::location(&mut manager.conn);
+        let _ = fixtures::disk(&mut manager.conn, &loc);
         let disks = manager.list_disks().unwrap();
         assert_ne!(disks, vec![]);
     }
@@ -552,7 +577,8 @@ mod tests {
     #[test_log::test]
     fn list_partitions() {
         let mut manager = fixtures::manager();
-        let disk = fixtures::disk(&mut manager.conn);
+        let loc = fixtures::location(&mut manager.conn);
+        let disk = fixtures::disk(&mut manager.conn, &loc);
         let _ = fixtures::partition(&mut manager.conn, &disk);
         let parts = manager.list_partitions().unwrap();
         assert_ne!(parts, vec![]);
@@ -572,7 +598,8 @@ mod tests {
     #[test_log::test]
     fn inspect_file() {
         let mut manager = fixtures::manager();
-        let disk = fixtures::disk(&mut manager.conn);
+        let loc = fixtures::location(&mut manager.conn);
+        let disk = fixtures::disk(&mut manager.conn, &loc);
         let partition = fixtures::partition(&mut manager.conn, &disk);
         let coll = fixtures::collection(&mut manager.conn);
         let (file, _, _) = fixtures::file_full(&mut manager.conn, &partition, &coll);

@@ -10,7 +10,8 @@ A tool to allow data hoarders to split data sets across a pool of offline extern
 
 ```bash
 hoard init
-hoard disk add --label russia-leaks-01 /dev/sdb
+hoad location add my-home
+hoard disk add --location my-home --label russia-leaks-01 /dev/sdb
 hoard partition add /dev/sdb1
 hoard collection add vgtrk
 hoard file add -c vgtrk ~/torrents/some-leak/path-to-file.zip /some-leak/path-to-file.zip

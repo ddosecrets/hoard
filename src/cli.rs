@@ -15,14 +15,19 @@
 //! hoard init
 //! ```
 //!
-//! Create a collection of files.
+//! Add a DB entry for a collection of files.
 //! ```shell
-//! hoard collection add "my-leaks"
+//! hoard collection add my-leaks
+//! ```
+//!
+//! Add a DB entry for a location where you store hard disks.
+//! ```shell
+//! hoard location add my-home
 //! ```
 //!
 //! Add a DB entry for a physical disk.
 //! ```shell
-//! hoard disk add --label "my 4TB disk" /dev/sdb
+//! hoard disk add --locaiton my-home --label "my 4TB disk" /dev/sdb
 //! ```
 //!
 //! Add a DB entry for one of the logical partitions on the physical disk.
@@ -32,8 +37,7 @@
 //!
 //! Add a local file to the virtual "file system" of the disk pool.
 //! ```shell
-//! hoard file add --collection my-leaks \
-//!     /local/path/to/my/file.txt /some-dir/file.txt
+//! hoard file add --collection my-leaks /local/path/to/my/file.txt /some-dir/file.txt
 //! ```
 //!
 //! Run an `ls`-like command against the virtual "file system" (works offline).
@@ -50,9 +54,14 @@
 //! ```shell
 //! hoard file inspect --collection my-leaks /some-dir/file.txt
 //! ```
+//!
+//! Get the path to the file on the local file system if one of the partition is mounted.
+//! ```shell
+//! hoard file path --collection my-leaks /some-dir/file.txt
+//! ```
 use crate::config::Config;
 use crate::db::init_connection;
-use crate::db::types::Collection;
+use crate::db::types::{Collection, Location};
 use crate::fs_utils::canonical_path;
 use crate::manager::Manager;
 use clap::Parser;
@@ -152,6 +161,7 @@ fn main_inner() -> anyhow::Result<()> {
         Command::Disk(cmd) => cmd.run(&mut manager),
         Command::Init => Ok(()), // this was already handled
         Command::File(cmd) => cmd.run(&mut manager),
+        Command::Location(cmd) => cmd.run(&mut manager),
         Command::Partition(cmd) => cmd.run(&mut manager),
         Command::Sync { collection_name } => {
             let collection = get_collection(manager.conn(), &collection_name)?;
@@ -179,6 +189,10 @@ fn parse_regex(string: &str) -> Result<Regex, String> {
     // new line to separate Clap's error line from the nicely formatted
     // helper string for the regex  syntax error
     Regex::new(string).map_err(|e| format!("\n{e}"))
+}
+
+fn get_location(conn: &Connection, name: &str) -> anyhow::Result<Location> {
+    Location::for_name(conn, name)?.ok_or_else(|| anyhow!("Location with name {name} not found"))
 }
 
 fn get_collection(conn: &Connection, name: &str) -> anyhow::Result<Collection> {
@@ -221,6 +235,9 @@ enum Command {
     File(FileCmd),
     /// Initialize the local directories
     Init,
+    /// Manage locations
+    #[clap(subcommand)]
+    Location(LocationCmd),
     /// Manage partitions on physical disks
     #[clap(subcommand)]
     Partition(PartitionCmd),
@@ -279,6 +296,9 @@ impl DatabaseCmd {
 enum DiskCmd {
     /// Add a new disk
     Add {
+        /// The name of the location of the disk
+        #[clap(long = "location", value_name = "NAME")]
+        location: String,
         /// The path to the disk (e.g., /dev/sdb)
         path: String,
         /// The physical label on the housing of the disk (e.g., "Secret Data 0161")
@@ -293,7 +313,14 @@ enum DiskCmd {
 impl DiskCmd {
     fn run(&self, manager: &mut Manager) -> anyhow::Result<()> {
         match self {
-            Self::Add { path, label } => manager.add_disk(path, label),
+            Self::Add {
+                location,
+                path,
+                label,
+            } => {
+                let location = get_location(manager.conn(), location)?;
+                manager.add_disk(location.id(), path, label)
+            }
             Self::List => print_table(manager.list_disks()?.with_title()),
         }
     }
@@ -448,6 +475,28 @@ impl FileCmd {
                 println!("{}", path);
                 Ok(())
             }
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
+#[clap(disable_help_subcommand = true)]
+enum LocationCmd {
+    /// Add a new location
+    Add {
+        /// The name of the location (e.g., "home" or "offsite-01")
+        name: String,
+    },
+    /// List all locations
+    #[clap(name = "ls")]
+    List,
+}
+
+impl LocationCmd {
+    fn run(&self, manager: &mut Manager) -> anyhow::Result<()> {
+        match self {
+            Self::Add { name } => manager.add_location(name),
+            Self::List => print_table(manager.list_locations()?.with_title()),
         }
     }
 }

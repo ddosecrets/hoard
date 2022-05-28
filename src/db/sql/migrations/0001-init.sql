@@ -14,15 +14,27 @@ CREATE TABLE collections (
     created_date TEXT NOT NULL
 );
 
+CREATE TABLE locations (
+    id BINARY(16) NOT NULL
+        PRIMARY KEY CONSTRAINT pk_locations
+        CHECK (length(id) = 16) CONSTRAINT ck_locations_id,
+    name TEXT NOT NULL
+        UNIQUE CONSTRAINT uq_locations_name
+);
+
 CREATE TABLE disks (
     id BINARY(16) NOT NULL
         PRIMARY KEY CONSTRAINT pk_disks
         CHECK (length(id) = 16) CONSTRAINT ck_disks_id,
+    location_id BINARY(16) NOT NULL,
     serial_number TEXT NOT NULL
         UNIQUE CONSTRAINT uq_disks_serial_number,
     label TEXT NOT NULL
         UNIQUE CONSTRAINT uq_disks_label,
-    created_date TEXT NOT NULL
+    created_date TEXT NOT NULL,
+    FOREIGN KEY (location_id)
+        REFERENCES locations(id)
+        CONSTRAINT fk_partitions_location_id
 );
 
 CREATE TABLE partitions (
